@@ -53,6 +53,7 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 	private Boolean isResumed = false;
 	private WriteNdefRequest writeNdefRequest = null;
 	private TagTechnologyRequest techRequest = null;
+  private Intent intent = new Intent();
 
 	class WriteNdefRequest {
 		NdefMessage message;
@@ -83,7 +84,7 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 	}
 
 	private boolean hasPendingRequest() {
-		return writeNdefRequest != null || techRequest != null; 
+		return writeNdefRequest != null || techRequest != null;
 	}
 
 	@ReactMethod
@@ -205,7 +206,52 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 		}
 	}
 
-	@ReactMethod
+  // 写入自定义格式
+  @ReactMethod
+  public void writeExtraMessage(String string, Callback callback) {
+    synchronized(this) {
+      if (techRequest != null) {
+        try {
+          Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+          Ndef ndef = Ndef.get(tag);
+          ndef.connect();
+          NdefRecord ndefRecord = NdefRecord.createTextRecord(null, string);
+          NdefRecord[] records = {ndefRecord};
+          NdefMessage ndefMessage = new NdefMessage(records);
+          ndef.writeNdefMessage(ndefMessage);
+        } catch (Exception ex) {
+          Log.d(LOG_TAG, "writeExtraTagMessage fail");
+          callback.invoke("writeExtraTagMessage fail");
+        }
+      } else {
+        callback.invoke("no tech request available");
+      }
+    }
+  }
+
+  // 读取自定义格式
+  @ReactMethod
+  public String readExtraMessage(Callback callback){
+	  try{
+      Parcelable[] rawArray = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+      if (rawArray != null) {
+        NdefMessage mNdefMsg = (NdefMessage) rawArray[0];
+        NdefRecord mNdefRecord = mNdefMsg.getRecords()[0];
+        if (mNdefRecord != null) {
+          String readResult = new String(mNdefRecord.getPayload(), "UTF-8");
+          callback.invoke(readResult);
+        }else{
+          callback.invoke("");
+        }
+      }
+    } catch(Exception e){
+	    Log.d(LOG_TAG, e.getMessage());
+	    callback.invoke(e.getMessage());
+    }
+  }
+
+
+  @ReactMethod
 	public void makeReadOnly(Callback callback) {
 		synchronized(this) {
 		    if (techRequest != null) {
@@ -274,7 +320,7 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 		    } else {
 				boolean format = options.getBoolean("format");
 				boolean formatReadOnly = options.getBoolean("formatReadOnly");
-				
+
 		        try {
 					NdefMessage msgToWrite;
 
@@ -290,10 +336,10 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 
 		    		writeNdefRequest = new WriteNdefRequest(
 						msgToWrite,
-						callback, // defer the callback 
+						callback, // defer the callback
 						format,
 						formatReadOnly
-					); 
+					);
 		        } catch (FormatException e) {
 		        	callback.invoke("Incorrect ndef format");
 		        }
@@ -314,7 +360,7 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 					NdefMessage msgToPush = null;
 					if (rnArray != null) {
 						msgToPush = new NdefMessage(rnArrayToBytes(rnArray));
-					}	
+					}
 
 					NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(context);
 					nfcAdapter.setNdefPushMessage(msgToPush, currentActivity);
@@ -349,7 +395,7 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 			callback.invoke("no nfc support");
 		}
 	}
-    
+
    	@ReactMethod
 	public void isSupported(Callback callback){
 		Log.d(LOG_TAG, "isSupported");
@@ -574,7 +620,7 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 		synchronized(this) {
 			if (writeNdefRequest != null) {
 				writeNdef(
-					tag, 
+					tag,
 					writeNdefRequest
 				);
 				writeNdefRequest = null;
@@ -665,7 +711,7 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
     }
 
 	private void writeNdef(Tag tag, WriteNdefRequest request) {
-		NdefMessage message = request.message; 
+		NdefMessage message = request.message;
 		Callback callback = request.callback;
 		boolean formatReadOnly = request.formatReadOnly;
 		boolean format = request.format;
