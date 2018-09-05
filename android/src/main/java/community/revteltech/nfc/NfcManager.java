@@ -35,6 +35,8 @@ import android.os.Parcelable;
 import org.json.JSONObject;
 import org.json.JSONException;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.*;
 
 import static android.app.Activity.RESULT_OK;
@@ -142,6 +144,7 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 				    WritableMap parsed = tag2React(tag);
 				    callback.invoke(null, parsed);
 				} catch (Exception ex) {
+				    Log.d(LOG_TAG, ex.getMessage());
 					Log.d(LOG_TAG, "getTag fail");
 					callback.invoke("getTag fail");
 				}
@@ -206,9 +209,8 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
 		}
 	}
 
-  // 写入自定义格式
   @ReactMethod
-  public void writeExtraMessage(String string, Callback callback) {
+  public void writeExtraMessage(String string, Callback callback) throws IOException, FormatException {
     synchronized(this) {
       if (techRequest != null) {
         try {
@@ -220,8 +222,8 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
           NdefMessage ndefMessage = new NdefMessage(records);
           ndef.writeNdefMessage(ndefMessage);
         } catch (Exception ex) {
-          Log.d(LOG_TAG, "writeExtraTagMessage fail");
-          callback.invoke("writeExtraTagMessage fail");
+          Log.d(LOG_TAG, "writeNdefMessage fail");
+          callback.invoke("writeNdefMessage fail");
         }
       } else {
         callback.invoke("no tech request available");
@@ -229,9 +231,8 @@ class NfcManager extends ReactContextBaseJavaModule implements ActivityEventList
     }
   }
 
-  // 读取自定义格式
   @ReactMethod
-  public String readExtraMessage(Callback callback){
+  public String readExtraMessage(Callback callback) throws UnsupportedEncodingException {
 	  try{
       Parcelable[] rawArray = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
       if (rawArray != null) {
